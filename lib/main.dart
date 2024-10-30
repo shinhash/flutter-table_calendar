@@ -12,7 +12,7 @@ void main() async {
       theme: ThemeData(
         fontFamily: 'NotoSans',
       ),
-      home: const HomeScreen(),
+      home: HomeScreen(),
     )
   );
 }
