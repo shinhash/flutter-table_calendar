@@ -1,5 +1,7 @@
-import 'package:calendar_scheduler/model/schedule.dart';
+import 'package:calendar_scheduler/database/drift.dart';
+import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
 import '../const/color.dart';
 import 'custum_text_field.dart';
 
@@ -111,29 +113,33 @@ class _ScheduleBottomSheetState extends State<ScheduleBottomSheet> {
     return null;
   }
 
-  onPresseSaveBtn() {
+  onPresseSaveBtn() async {
     final isValided = formKey.currentState!.validate();
     if (!isValided) return;
-
-    print('=========== SAVE ===========');
-    print(startTime);
-    print(endTime);
-    print(content);
-    print(selectedColor);
     formKey.currentState!.save();
-    print('=============================');
 
-    final scheduleInfo = Schedule(
-      scheduleId: 999,
-      startTime: startTime!,
-      endTime: endTime!,
-      content: content!,
-      category: selectedColor,
-      date: widget.selectedDay,
-      createTime: DateTime.now().toUtc(),
+    final database = GetIt.I<AppDatabase>();
+
+    if(!scheduleCheck(database)) return;
+
+    await database.futureInsertSchedule(
+      ScheduleTableCompanion(
+        startTime: Value(startTime!),
+        endTime: Value(endTime!),
+        content: Value(content!),
+        category: Value(selectedColor),
+        date: Value(widget.selectedDay),
+      )
     );
+    Navigator.of(context).pop();
+  }
 
-    Navigator.of(context).pop(scheduleInfo);
+  scheduleCheck(AppDatabase database) async {
+    if(startTime! > endTime!) return false;
+
+    final selectBetweenDate = await database.streamSelectBetweenSchedules(date: widget.selectedDay, startTime: startTime!, endTime: endTime!);
+    print('selectBetweenDate : ${selectBetweenDate}');
+    return true;
   }
 }
 

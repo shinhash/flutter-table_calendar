@@ -1,10 +1,11 @@
 import 'package:calendar_scheduler/component/schedule_bottom_sheet.dart';
 import 'package:calendar_scheduler/component/schedule_card.dart';
 import 'package:calendar_scheduler/component/today_banner.dart';
-import 'package:calendar_scheduler/model/schedule.dart';
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
 import '../component/t_calandar.dart';
 import '../const/color.dart';
+import '../database/drift.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,65 +27,12 @@ class _HomeScreenState extends State<HomeScreen> {
     DateTime.now().day,
   );
 
-  Map<DateTime, List<Schedule>> schedules = {
-    DateTime.utc(2024, 10, 30): [
-      Schedule(
-        scheduleId: 1,
-        startTime: 11,
-        endTime: 12,
-        content: 'content',
-        date: DateTime.utc(2024, 10, 30),
-        category: categoryColors[0],
-        createTime: DateTime.now().toUtc(),
-      ),
-      Schedule(
-        scheduleId: 2,
-        startTime: 15,
-        endTime: 17,
-        content: 'test 1',
-        date: DateTime.utc(2024, 10, 30),
-        category: categoryColors[5],
-        createTime: DateTime.now().toUtc(),
-      ),
-      Schedule(
-        scheduleId: 3,
-        startTime: 22,
-        endTime: 23,
-        content: 'test 2',
-        date: DateTime.utc(2024, 10, 30),
-        category: categoryColors[3],
-        createTime: DateTime.now().toUtc(),
-      ),
-    ],
-    DateTime.utc(2024, 10, 31): [
-      Schedule(
-        scheduleId: 4,
-        startTime: 07,
-        endTime: 09,
-        content: 'test 3',
-        date: DateTime.utc(2024, 10, 30),
-        category: categoryColors[5],
-        createTime: DateTime.now().toUtc(),
-      ),
-      Schedule(
-        scheduleId: 5,
-        startTime: 14,
-        endTime: 15,
-        content: 'test 4',
-        date: DateTime.utc(2024, 10, 30),
-        category: categoryColors[3],
-        createTime: DateTime.now().toUtc(),
-      ),
-    ],
-  };
-
   @override
   Widget build(BuildContext context) {
-    print(schedules.toString());
     return Scaffold(
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          Schedule scheduleInfo = await showModalBottomSheet(
+          await showModalBottomSheet(
             context: context,
             builder: (_) {
               return ScheduleBottomSheet(
@@ -92,25 +40,6 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             },
           );
-          setState(() {
-            // if(schedules.containsKey(scheduleInfo.date)){
-            //   List<Schedule> scheduleList = schedules[scheduleInfo.date]!.map((modelData) => modelData).toList();
-            //   scheduleList.add(scheduleInfo);
-            //   schedules[scheduleInfo.date] = scheduleList;
-            // }else{
-            //   List<Schedule> scheduleList = [];
-            //   scheduleList.add(scheduleInfo);
-            //   schedules[scheduleInfo.date] = scheduleList;
-            // }
-
-            schedules = {
-              ...schedules,
-              scheduleInfo.date: [
-                if (schedules.containsKey(scheduleInfo.date)) ...schedules[scheduleInfo.date]!,
-                scheduleInfo,
-              ]
-            };
-          });
         },
         backgroundColor: primaryColor,
         child: const Icon(
@@ -128,9 +57,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             TodayBanner(
               selectedDay: selectedDay,
-              taskCount: schedules.containsKey(selectedDay)
-                  ? schedules[selectedDay]!.length
-                  : 0,
+              taskCount: 0,
             ),
             Expanded(
               child: Padding(
@@ -139,25 +66,50 @@ class _HomeScreenState extends State<HomeScreen> {
                   right: 16.0,
                   top: 16.0,
                 ),
-                child: ListView.builder(
-                  itemCount: schedules.containsKey(selectedDay)
-                      ? schedules[selectedDay]!.length
-                      : 0,
-                  itemBuilder: (BuildContext context, int index) {
-                    final selectedSchedules = schedules[selectedDay]!;
-                    final scheduleModel = selectedSchedules[index];
-                    return ScheduleCard(
-                      startTime: scheduleModel.startTime,
-                      endTime: scheduleModel.endTime,
-                      content: scheduleModel.content,
-                      color: Color(
-                        int.parse('FF${scheduleModel.category}', radix: 16),
-                      ),
+                child: StreamBuilder<List<ScheduleTableData>>(
+                  stream: GetIt.I<AppDatabase>().streamSelectSchedules(date: selectedDay),
+                  builder: (context, snapshot) {
+                    if(snapshot.hasError){
+                      return Center(
+                        child: Text(snapshot.error.toString()),
+                      );
+                    }
+
+                    if(snapshot.connectionState == ConnectionState.waiting){
+                      return const Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    }
+
+                    final schedules = snapshot.data!;
+
+                    return ListView.builder(
+                      itemCount: schedules.length,
+                      itemBuilder: (BuildContext context, int index) {
+                        final scheduleModel = schedules[index];
+                        return Dismissible(
+                          key: ObjectKey(scheduleModel.scheduleId),
+                          direction: DismissDirection.endToStart,
+                          // confirmDismiss: (DismissDirection direction) async {
+                          //   await GetIt.I<AppDatabase>().streamDeleteSchedule(scheduleId: scheduleModel.scheduleId);
+                          //   return true;
+                          // },
+                          onDismissed: (DismissDirection direction){
+                            GetIt.I<AppDatabase>().futureDeleteSchedule(scheduleId: scheduleModel.scheduleId);
+                          },
+                          child: ScheduleCard(
+                            startTime: scheduleModel.startTime,
+                            endTime: scheduleModel.endTime,
+                            content: scheduleModel.content,
+                            color: Color(int.parse('FF${scheduleModel.category}', radix: 16)),
+                          ),
+                        );
+                      },
                     );
-                  },
+                  }
                 ),
               ),
-            )
+            ),
           ],
         ),
       ),
