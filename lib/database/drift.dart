@@ -53,13 +53,23 @@ class AppDatabase extends _$AppDatabase {
     return selectQuery.watch();
   }
 
-  Stream<List<ScheduleTableData>> streamSelectBetweenSchedules({required DateTime date, required int startTime, required int endTime}){
+  Stream<List<bool>> streamSelectBetweenSchedules({required DateTime date, required int startTime, required int endTime}){
     final selectQuery = select(scheduleTable);
     selectQuery.where((table) => table.date.equals(date));
-    selectQuery.where((table) => table.startTime.isBetweenValues(startTime, endTime));
-    selectQuery.where((table) => table.endTime.isBetweenValues(startTime, endTime));
-    print('selectQuery : ${selectQuery.toString()}');
-    return selectQuery.watch();
+
+    return selectQuery.addColumns([]).map((row) {
+      final dbStartTime = row.rawData.data['schedule_table.start_time'];
+      final dbEndTime = row.rawData.data['schedule_table.end_time'];
+      if((dbStartTime < startTime && startTime < dbEndTime)
+          ||(dbStartTime < endTime && endTime < dbEndTime)
+          ||(startTime < dbStartTime && dbEndTime < endTime)
+          ||(startTime <= dbStartTime && dbEndTime < endTime)
+          ||(startTime < dbStartTime && dbEndTime <= endTime)) {
+        return false;
+      }else{
+        return true;
+      }
+    }).watch();
   }
 
   @override

@@ -118,11 +118,13 @@ class _ScheduleBottomSheetState extends State<ScheduleBottomSheet> {
     if (!isValided) return;
     formKey.currentState!.save();
 
-    final database = GetIt.I<AppDatabase>();
+    /// 해당 일자에 시간이 겹치는 스케쥴이 있는지 체크
+    final isScheduleAdd = await scheduleCheck();
+    final result = (isScheduleAdd as List).indexOf(false);
+    if (result != -1) return CustomAlertDialog();
 
-    if(!scheduleCheck(database)) return;
-
-    await database.futureInsertSchedule(
+    /// 해당 일자에 스케쥴 추가
+    await GetIt.I<AppDatabase>().futureInsertSchedule(
       ScheduleTableCompanion(
         startTime: Value(startTime!),
         endTime: Value(endTime!),
@@ -134,12 +136,67 @@ class _ScheduleBottomSheetState extends State<ScheduleBottomSheet> {
     Navigator.of(context).pop();
   }
 
-  scheduleCheck(AppDatabase database) async {
-    if(startTime! > endTime!) return false;
+  scheduleCheck() async {
+    if (startTime! > endTime!) return false;
 
-    final selectBetweenDate = await database.streamSelectBetweenSchedules(date: widget.selectedDay, startTime: startTime!, endTime: endTime!);
-    print('selectBetweenDate : ${selectBetweenDate}');
-    return true;
+    final result = await GetIt.I<AppDatabase>().streamSelectBetweenSchedules(
+      date: widget.selectedDay,
+      startTime: startTime!,
+      endTime: endTime!,
+    );
+    List<bool> boolList = [];
+    await for (final resp in result) {
+      boolList.addAll(resp);
+      print('boolList : ${boolList}');
+      return boolList;
+    }
+  }
+
+  void CustomAlertDialog() {
+    showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            // RoundedRectangleBorder - Dialog 화면 모서리 둥글게 조절
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10.0)),
+            //Dialog Main Title
+            title: Column(
+              children: <Widget>[
+                new Text(
+                  "알림창",
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+            //
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  "입력하신 시작 시간 혹은 마감 시간을 \n확인해주세요.",
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            actions: <Widget>[
+              new ElevatedButton(
+                child: new Text("확인"),
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          );
+        });
   }
 }
 

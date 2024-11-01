@@ -15,6 +15,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  int scheduleCount = 0;
+
   DateTime calendarFocusedDay = DateTime(
     DateTime.now().year,
     DateTime.now().month,
@@ -57,7 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             TodayBanner(
               selectedDay: selectedDay,
-              taskCount: 0,
+              taskCount: scheduleCount,
             ),
             Expanded(
               child: Padding(
