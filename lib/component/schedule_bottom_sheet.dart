@@ -6,9 +6,11 @@ import '../const/color.dart';
 import 'custum_text_field.dart';
 
 class ScheduleBottomSheet extends StatefulWidget {
+  final int? scheduleId;
   final DateTime selectedDay;
 
   const ScheduleBottomSheet({
+    required this.scheduleId,
     required this.selectedDay,
     super.key,
   });
@@ -26,42 +28,76 @@ class _ScheduleBottomSheetState extends State<ScheduleBottomSheet> {
   String selectedColor = categoryColors.first;
 
   @override
+  void initState() {
+    super.initState();
+    initCategory();
+  }
+
+  initCategory() async {
+    if(widget.scheduleId != null){
+      final resp = await GetIt.I<AppDatabase>().futureSelectScheduleOne(widget.scheduleId!);
+      setState(() {
+        selectedColor = resp.category;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      height: 600,
-      child: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.only(left: 8.0, right: 8.0, top: 16.0),
-          child: Form(
-            key: formKey,
-            child: Column(
-              children: [
-                _Time(
-                  onStartTimeSave: onStartTimeSave,
-                  onEndTimeSave: onEndTimeSave,
-                  onStartTimeValidate: onStartTimeValidate,
-                  onEndTimeValidater: onEndTimeValidater,
+    return FutureBuilder(
+      future: widget.scheduleId == null
+          ? null
+          : GetIt.I<AppDatabase>().futureSelectScheduleOne(widget.scheduleId!),
+      builder: (context, snapshot) {
+        if (widget.scheduleId != null
+            && snapshot.connectionState == ConnectionState.waiting
+            && !snapshot.hasData){
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        }
+
+        final scheduleData = snapshot.data;
+        return Container(
+          color: Colors.white,
+          height: 600,
+          child: SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(left: 8.0, right: 8.0, top: 16.0),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  children: [
+                    _Time(
+                      onStartTimeSave: onStartTimeSave,
+                      onEndTimeSave: onEndTimeSave,
+                      onStartTimeValidate: onStartTimeValidate,
+                      onEndTimeValidater: onEndTimeValidater,
+                      startTimeInitValue: scheduleData?.startTime.toString(),
+                      endTimeInitValue: scheduleData?.endTime.toString(),
+                    ),
+                    _Content(
+                      onContentSave: onContentSave,
+                      onContentValidater: onContentValidater,
+                      contentInitValue: scheduleData?.content,
+                    ),
+                    SizedBox(height: 8.0),
+                    _Categories(
+                      selectedColor: selectedColor,
+                      onTabCategory: onTabCategory,
+                    ),
+                    SizedBox(height: 8.0),
+                    _SaveButton(
+                      onPressSaveBtn: onPresseSaveBtn,
+                    ),
+                    SizedBox(height: 8.0),
+                  ],
                 ),
-                _Content(
-                  onContentSave: onContentSave,
-                  onContentValidater: onContentValidater,
-                ),
-                SizedBox(height: 8.0),
-                _Categories(
-                  selectedColor: selectedColor,
-                  onTabCategory: onTabCategory,
-                ),
-                SizedBox(height: 8.0),
-                _SaveButton(
-                  onPressSaveBtn: onPresseSaveBtn,
-                ),
-                SizedBox(height: 8.0),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      }
     );
   }
 
@@ -123,16 +159,32 @@ class _ScheduleBottomSheetState extends State<ScheduleBottomSheet> {
     final result = (isScheduleAdd as List).indexOf(false);
     if (result != -1) return CustomAlertDialog();
 
+    final database = GetIt.I<AppDatabase>();
+
     /// 해당 일자에 스케쥴 추가
-    await GetIt.I<AppDatabase>().futureInsertSchedule(
-      ScheduleTableCompanion(
-        startTime: Value(startTime!),
-        endTime: Value(endTime!),
-        content: Value(content!),
-        category: Value(selectedColor),
-        date: Value(widget.selectedDay),
-      )
-    );
+    if(widget.scheduleId == null){
+      await database.futureInsertSchedule(
+          ScheduleTableCompanion(
+            startTime: Value(startTime!),
+            endTime: Value(endTime!),
+            content: Value(content!),
+            category: Value(selectedColor),
+            date: Value(widget.selectedDay),
+          )
+      );
+    }else{
+      await database.futureUpdateSchedule(
+          widget.scheduleId!,
+          ScheduleTableCompanion(
+            startTime: Value(startTime!),
+            endTime: Value(endTime!),
+            content: Value(content!),
+            category: Value(selectedColor),
+            date: Value(widget.selectedDay),
+          )
+      );
+    }
+
     Navigator.of(context).pop();
   }
 
@@ -143,6 +195,7 @@ class _ScheduleBottomSheetState extends State<ScheduleBottomSheet> {
       date: widget.selectedDay,
       startTime: startTime!,
       endTime: endTime!,
+      scheduleIdInfo: widget.scheduleId != null ? widget.scheduleId.toString() : '',
     );
     List<bool> boolList = [];
     await for (final resp in result) {
@@ -205,12 +258,16 @@ class _Time extends StatelessWidget {
   final FormFieldSetter<String> onEndTimeSave;
   final FormFieldValidator<String> onStartTimeValidate;
   final FormFieldValidator<String> onEndTimeValidater;
+  final String? startTimeInitValue;
+  final String? endTimeInitValue;
 
   const _Time({
     required this.onStartTimeSave,
     required this.onEndTimeSave,
     required this.onStartTimeValidate,
     required this.onEndTimeValidater,
+    this.startTimeInitValue,
+    this.endTimeInitValue,
     super.key,
   });
 
@@ -223,6 +280,7 @@ class _Time extends StatelessWidget {
             label: '시작 시간',
             onSaveTextFormField: onStartTimeSave,
             validatorTextFormField: onStartTimeValidate,
+            initialValue: startTimeInitValue,
           ),
         ),
         SizedBox(
@@ -233,6 +291,7 @@ class _Time extends StatelessWidget {
             label: '마감 시간',
             onSaveTextFormField: onEndTimeSave,
             validatorTextFormField: onEndTimeValidater,
+            initialValue: endTimeInitValue,
           ),
         ),
       ],
@@ -243,10 +302,12 @@ class _Time extends StatelessWidget {
 class _Content extends StatelessWidget {
   final FormFieldSetter<String> onContentSave;
   final FormFieldValidator<String> onContentValidater;
+  final String? contentInitValue;
 
   const _Content({
     required this.onContentSave,
     required this.onContentValidater,
+    required this.contentInitValue,
     super.key,
   });
 
@@ -258,6 +319,7 @@ class _Content extends StatelessWidget {
         expend: true,
         onSaveTextFormField: onContentSave,
         validatorTextFormField: onContentValidater,
+        initialValue: contentInitValue,
       ),
     );
   }

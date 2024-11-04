@@ -30,9 +30,15 @@ class AppDatabase extends _$AppDatabase {
 
   Future<int> futureInsertSchedule(ScheduleTableCompanion data) => into(scheduleTable).insert(data);
 
+  Future<ScheduleTableData> futureSelectScheduleOne(int schedleId){
+    final selectOneQuery = select(scheduleTable);
+    selectOneQuery.where((table) => table.scheduleId.equals(schedleId));
+    return selectOneQuery.getSingle();
+  }
+
   Future<int> futureUpdateSchedule(int scheduleId, ScheduleTableCompanion data){
     final updateQuery = update(scheduleTable);
-    update(scheduleTable).where((table) => table.scheduleId.equals(scheduleId));
+    updateQuery.where((table) => table.scheduleId.equals(scheduleId));
     return updateQuery.write(data);
   }
 
@@ -53,14 +59,24 @@ class AppDatabase extends _$AppDatabase {
     return selectQuery.watch();
   }
 
-  Stream<List<bool>> streamSelectBetweenSchedules({required DateTime date, required int startTime, required int endTime}){
+  Stream<List<bool>> streamSelectBetweenSchedules({
+    required DateTime date,
+    required int startTime,
+    required int endTime,
+    required String scheduleIdInfo,
+  }){
     final selectQuery = select(scheduleTable);
     selectQuery.where((table) => table.date.equals(date));
 
     return selectQuery.addColumns([]).map((row) {
       final dbStartTime = row.rawData.data['schedule_table.start_time'];
       final dbEndTime = row.rawData.data['schedule_table.end_time'];
-      if((dbStartTime < startTime && startTime < dbEndTime)
+      final dbScheduleId = row.rawData.data['schedule_table.schedule_id'];
+
+      if(scheduleIdInfo != '' && dbScheduleId == int.parse(scheduleIdInfo)){
+        return true;
+      }
+      else if((dbStartTime < startTime && startTime < dbEndTime)
           ||(dbStartTime < endTime && endTime < dbEndTime)
           ||(startTime < dbStartTime && dbEndTime < endTime)
           ||(startTime <= dbStartTime && dbEndTime < endTime)

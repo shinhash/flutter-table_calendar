@@ -6,11 +6,13 @@ class CustumTextField extends StatelessWidget {
   final bool expend;
   final FormFieldSetter<String> onSaveTextFormField;
   final FormFieldValidator<String> validatorTextFormField;
+  final String? initialValue;
 
   const CustumTextField({
     required this.label,
     required this.onSaveTextFormField,
     required this.validatorTextFormField,
+    this.initialValue,
     this.expend = false,
     super.key,
   });
@@ -46,6 +48,7 @@ class CustumTextField extends StatelessWidget {
       maxLines: expend ? null : 1,
       expands: expend,
       cursorColor: Colors.grey,
+      initialValue: initialValue,
     );
   }
 }

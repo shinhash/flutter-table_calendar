@@ -6,6 +6,7 @@ import 'package:get_it/get_it.dart';
 import '../component/t_calandar.dart';
 import '../const/color.dart';
 import '../database/drift.dart';
+import '../service/service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,6 +17,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int scheduleCount = 0;
+  int? scheduleId;
 
   DateTime calendarFocusedDay = DateTime(
     DateTime.now().year,
@@ -39,6 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
             builder: (_) {
               return ScheduleBottomSheet(
                 selectedDay: selectedDay,
+                scheduleId: scheduleId,
               );
             },
           );
@@ -69,47 +72,96 @@ class _HomeScreenState extends State<HomeScreen> {
                   top: 16.0,
                 ),
                 child: StreamBuilder<List<ScheduleTableData>>(
-                  stream: GetIt.I<AppDatabase>().streamSelectSchedules(date: selectedDay),
-                  builder: (context, snapshot) {
-                    if(snapshot.hasError){
-                      return Center(
-                        child: Text(snapshot.error.toString()),
-                      );
-                    }
-
-                    if(snapshot.connectionState == ConnectionState.waiting){
-                      return const Center(
-                        child: CircularProgressIndicator(),
-                      );
-                    }
-
-                    final schedules = snapshot.data!;
-
-                    return ListView.builder(
-                      itemCount: schedules.length,
-                      itemBuilder: (BuildContext context, int index) {
-                        final scheduleModel = schedules[index];
-                        return Dismissible(
-                          key: ObjectKey(scheduleModel.scheduleId),
-                          direction: DismissDirection.endToStart,
-                          // confirmDismiss: (DismissDirection direction) async {
-                          //   await GetIt.I<AppDatabase>().streamDeleteSchedule(scheduleId: scheduleModel.scheduleId);
-                          //   return true;
-                          // },
-                          onDismissed: (DismissDirection direction){
-                            GetIt.I<AppDatabase>().futureDeleteSchedule(scheduleId: scheduleModel.scheduleId);
-                          },
-                          child: ScheduleCard(
-                            startTime: scheduleModel.startTime,
-                            endTime: scheduleModel.endTime,
-                            content: scheduleModel.content,
-                            color: Color(int.parse('FF${scheduleModel.category}', radix: 16)),
-                          ),
+                    stream: GetIt.I<AppDatabase>().streamSelectSchedules(date: selectedDay),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        return Center(
+                          child: Text(snapshot.error.toString()),
                         );
-                      },
-                    );
-                  }
+                      }
+
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(
+                          child: CircularProgressIndicator(),
+                        );
+                      }
+
+                      final schedules = snapshot.data!;
+
+                      return ListView.builder(
+                        itemCount: schedules.length,
+                        itemBuilder: (BuildContext context, int index) {
+                          final scheduleModel = schedules[index];
+                          return Dismissible(
+                            key: ObjectKey(scheduleModel.scheduleId),
+                            direction: DismissDirection.endToStart,
+                            // confirmDismiss: (DismissDirection direction) async {
+                            //   await GetIt.I<AppDatabase>().streamDeleteSchedule(scheduleId: scheduleModel.scheduleId);
+                            //   return true;
+                            // },
+                            onDismissed: (DismissDirection direction) {
+                              GetIt.I<AppDatabase>().futureDeleteSchedule(
+                                  scheduleId: scheduleModel.scheduleId);
+                            },
+                            child: GestureDetector(
+                              onTap: () async {
+                                await showModalBottomSheet(
+                                  context: context,
+                                  builder: (_) {
+                                    return ScheduleBottomSheet(
+                                      selectedDay: selectedDay,
+                                      scheduleId: scheduleModel.scheduleId,
+                                    );
+                                  },
+                                );
+                              },
+                              child: ScheduleCard(
+                                startTime: scheduleModel.startTime,
+                                endTime: scheduleModel.endTime,
+                                content: scheduleModel.content,
+                                color: Color(
+                                  int.parse('FF${scheduleModel.category}',
+                                      radix: 16),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    }),
+              ),
+            ),
+
+
+
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(
+                  left: 16.0,
+                  right: 16.0,
+                  top: 16.0,
                 ),
+                child: FutureBuilder(
+                    future: selectCategoryService(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        return Center(
+                          child: Text(snapshot.error.toString()),
+                        );
+                      }
+
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(
+                          child: CircularProgressIndicator(),
+                        );
+                      }
+
+                      final resp = snapshot.data!;
+                      logger.d('resp : ${resp}');
+                      return Container(
+                        child: Text('test'),
+                      );
+                    }),
               ),
             ),
           ],
@@ -128,4 +180,21 @@ class _HomeScreenState extends State<HomeScreen> {
   bool selectedDayPredicate(DateTime selectedDay) {
     return selectedDay.isAtSameMomentAs(this.selectedDay);
   }
+
+  selectCategoryService() async {
+    final sendData = {
+      'selectedDate' : '',
+    };
+    final temp = await ScheduleApi().scheduleService(url: '/category/list', sendData: sendData);
+    logger.d('temp : ${temp}');
+  }
+
+  selectScheduleService() async {
+    final sendData = {
+      'selectedDate' : '',
+    };
+    final temp = await ScheduleApi().scheduleService(url: '/schedule/list', sendData: sendData);
+    logger.d('temp : ${temp}');
+  }
+
 }
